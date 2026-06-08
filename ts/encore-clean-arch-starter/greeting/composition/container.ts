@@ -3,9 +3,9 @@ import { GetVersionUseCase } from "../application/use-cases/get-version.usecase"
 import { ListRecentGreetingsUseCase } from "../application/use-cases/list-recent-greetings.usecase";
 import { SayHelloUseCase } from "../application/use-cases/say-hello.usecase";
 import { SystemClock } from "../infrastructure/clock/system-clock";
-import { InMemoryEventPublisher } from "../infrastructure/events/in-memory-event-publisher";
+import { PubSubEventPublisher } from "../infrastructure/events/pubsub-event-publisher";
 import { UuidIdGenerator } from "../infrastructure/id/uuid-id-generator";
-import { InMemoryGreetingRepository } from "../infrastructure/repositories/in-memory-greeting.repository";
+import { SqlGreetingRepository } from "../infrastructure/repositories/sql-greeting.repository";
 
 /**
  * Composition root for the greeting service.
@@ -16,10 +16,10 @@ import { InMemoryGreetingRepository } from "../infrastructure/repositories/in-me
  * change here and nowhere else. The architecture contract forbids any other layer
  * from importing `infrastructure`, so this stays true.
  */
-const greetingRepository = new InMemoryGreetingRepository();
+const greetingRepository = new SqlGreetingRepository();
 const clock = new SystemClock();
 const idGenerator = new UuidIdGenerator();
-const eventPublisher = new InMemoryEventPublisher();
+const eventPublisher = new PubSubEventPublisher();
 
 export const sayHelloUseCase = new SayHelloUseCase(
   greetingRepository,

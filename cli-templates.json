@@ -58,7 +58,7 @@
     {
         "title": "Clean Architecture",
         "desc": "Clean Architecture starter, enforced by ArchContract",
-        "template": "ts/encore-base",
+        "template": "ts/encore-clean-arch-starter",
         "lang": "ts"
     }
 ]

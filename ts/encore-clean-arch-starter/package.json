@@ -1,5 +1,5 @@
 {
-  "name": "encore-base",
+  "name": "encore-clean-arch-starter",
   "private": true,
   "version": "1.0.0",
   "description": "Encore.ts Clean Architecture starter, enforced by ArchContract",
@@ -17,7 +17,7 @@
     "vitest": "^1.5.0"
   },
   "dependencies": {
-    "encore.dev": "^1.35.3"
+    "encore.dev": "^1.57.4"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.13.0"

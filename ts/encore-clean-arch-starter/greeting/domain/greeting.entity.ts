@@ -36,6 +36,11 @@ export class Greeting {
     return greeting;
   }
 
+  /** Reconstitute a persisted aggregate from storage — no events are raised. */
+  static restore(props: GreetingProps): Greeting {
+    return new Greeting(props);
+  }
+
   get id(): string {
     return this.props.id;
   }

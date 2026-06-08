@@ -1,4 +1,4 @@
-# Clean Architecture Starter (encore-base)
+# Clean Architecture Starter (encore-clean-arch-starter)
 
 A small Encore.ts service built as a **complete, textbook Clean Architecture**
 reference — and kept that way automatically by
@@ -16,17 +16,24 @@ root — and a CI check that fails the build the moment any of that drifts.
 - **Linux:** `curl -L https://encore.dev/install.sh | bash`
 - **Windows:** `iwr https://encore.dev/install.ps1 | iex`
 
+**Install [Docker](https://docker.com)** — required to run the local Postgres database.
+
 ## Create app
 
 ```bash
-encore app create my-app-name --example=ts/encore-base
+encore app create my-app-name --example=ts/encore-clean-arch-starter
 ```
 
 ## Run app locally
 
+Make sure Docker is running, then:
+
 ```bash
 encore run
 ```
+
+Encore provisions a local Postgres database, applies the migrations, and starts a
+local Pub/Sub broker automatically.
 
 ## Using the API
 
@@ -41,7 +48,7 @@ curl "http://localhost:4000/hello/Ada?lang=pt"
 curl http://localhost:4000/greetings/recent
 # { "greetings": [ ... ] }
 
-curl http://localhost:4000/version   # { "name": "encore-base", "version": "1.0.0" }
+curl http://localhost:4000/version   # { "name": "encore-clean-arch-starter", "version": "1.0.0" }
 curl http://localhost:4000/health    # { "status": "ok", "service": "greeting" }
 ```
 
@@ -73,8 +80,11 @@ greeting/
 │   ├── ports/                              #   clock · id-generator · event-publisher (driven ports)
 │   └── mappers/greeting.mapper.ts          #   entity -> read model
 │
-├── infrastructure/                         # adapters — implement the ports
-│   ├── repositories/  · clock/  · id/  · events/
+├── infrastructure/                         # adapters — implement the ports with real Encore primitives
+│   ├── database.ts + migrations/           #   Encore SQLDatabase (Postgres)
+│   ├── repositories/sql-greeting.repository.ts
+│   ├── events/                             #   Pub/Sub Topic + publisher + subscription
+│   └── clock/  · id/
 │
 ├── presentation/                           # Encore handlers (thin) + HTTP error mapping
 │   ├── greeting.controller.ts
@@ -87,7 +97,7 @@ greeting/
 
 - **domain** depends on nothing — not even the Node runtime. Instantiate and test it with zero setup.
 - **application** depends only on the domain, and only through **ports**. Use-cases are framework-agnostic (no Encore).
-- **infrastructure** implements the ports. Swap the in-memory repository for an Encore `SQLDatabase` adapter and the domain/application layers don't change.
+- **infrastructure** implements the ports with real Encore primitives — Postgres via `SQLDatabase`, events via Pub/Sub `Topic`/`Subscription`. Swap an adapter (e.g. the event publisher) and the domain/application layers don't change.
 - **presentation** (Encore handlers) stays thin: it translates HTTP ⇄ use-case and maps errors. No `new`, no infrastructure imports.
 - **composition** is the single place that wires concrete adapters into use-cases.
 
@@ -121,18 +131,6 @@ milliseconds with no database and no Encore runtime — see the `*.test.ts` file
 npm test
 ```
 
-## Development
-
-### Add a database
-
-Replace `InMemoryGreetingRepository` with an Encore `SQLDatabase`-backed adapter
-that implements `GreetingRepositoryPort` — nothing in the domain or application
-layers changes. See https://encore.dev/docs/ts/primitives/databases
-
-### Publish domain events across services
-
-Replace `InMemoryEventPublisher` with an Encore Pub/Sub `Topic` adapter behind the
-same `EventPublisherPort`. See https://encore.dev/docs/ts/primitives/pubsub
 
 ## Deployment
 
