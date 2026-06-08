@@ -1,0 +1,73 @@
+# ArchContract — architecture as an executable contract.
+#
+# This project activates the built-in, AAA-quality `encore-ts` preset (service
+# boundaries, thin handlers, infra placement, no cross-service deep imports) and
+# layers a strict Clean Architecture contract ON TOP. A preset is merged UNDER
+# your config, so everything below tightens — never loosens — the preset.
+#
+#   npm run arch:check
+#
+version: 1
+
+project:
+  name: encore-base
+
+presets:
+  - encore-ts
+
+# --- Clean Architecture, enforced by path (independent of Encore's layers) ----
+rules:
+  # The domain is the center of the onion: it may not reach outward to the
+  # application, infrastructure, or composition layers. Dependencies point IN.
+  - name: domain-stays-pure
+    type: forbidden-import
+    from: { match: ["**/domain/**/*.ts"] }
+    to:
+      match:
+        - "**/application/**/*.ts"
+        - "**/infrastructure/**/*.ts"
+        - "**/services/**/*.ts"
+    severity: error
+
+  # Use-cases orchestrate the domain through PORTS; they never import a concrete
+  # infrastructure adapter. Wiring is the composition root's job, not theirs.
+  - name: application-depends-on-domain-not-infrastructure
+    type: forbidden-import
+    from: { match: ["**/application/**/*.ts"] }
+    to: { match: ["**/infrastructure/**/*.ts"] }
+    severity: error
+
+# --- Clean Architecture, enforced by shape -----------------------------------
+expectations:
+  # Use-cases are single-responsibility classes: `*UseCase` exposing `execute()`.
+  # `appliesTo: class` scopes the check to the class, so co-located input/output
+  # DTO interfaces in the same file are ignored.
+  - name: use-cases-are-classes-with-execute
+    expect: { path: ["**/application/**/*.usecase.ts"] }
+    appliesTo: { kind: ["class"] }
+    to:
+      haveSuffix: ["UseCase"]
+      haveMethod: ["execute"]
+    severity: error
+
+  # Repository ports are pure contracts: interfaces (or type aliases), never classes.
+  - name: repository-ports-are-interfaces
+    expect: { path: ["**/domain/**/ports/**/*.port.ts"] }
+    to:
+      be: ["interface", "type"]
+    severity: error
+
+  # Concrete repositories are adapters that implement a port.
+  - name: concrete-repositories-implement-a-port
+    expect: { path: ["**/infrastructure/repositories/**/*.repository.ts"] }
+    appliesTo: { kind: ["class"] }
+    to:
+      implement: ["*Port", "*RepositoryPort"]
+    severity: error
+
+  # The domain exposes named building blocks only — no default or barrel exports.
+  - name: domain-has-no-default-or-namespace-export
+    expect: { path: ["**/domain/**/*.ts"] }
+    to:
+      notHave: ["defaultExport", "namespaceExport"]
+    severity: error
