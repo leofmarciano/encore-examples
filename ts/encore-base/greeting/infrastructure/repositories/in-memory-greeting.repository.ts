@@ -2,20 +2,22 @@ import type { Greeting } from "../../domain/greeting.entity";
 import type { GreetingRepositoryPort } from "../../domain/ports/greeting-repository.port";
 
 /**
- * InMemoryGreetingRepository — a driven adapter implementing the repository port.
- *
- * This is the only place that knows HOW greetings are stored. Replace it with an
- * Encore `SQLDatabase`-backed adapter and nothing in the domain or application
- * layers changes — that is the payoff of depending on the port, not the detail.
+ * Driven adapter: an in-memory implementation of the greeting repository port.
+ * Replace it with an Encore `SQLDatabase`-backed adapter and the domain and
+ * application layers are untouched.
  */
 export class InMemoryGreetingRepository implements GreetingRepositoryPort {
-  private readonly greetings: Greeting[] = [];
+  private readonly store: Greeting[] = [];
 
   async save(greeting: Greeting): Promise<void> {
-    this.greetings.push(greeting);
+    this.store.push(greeting);
   }
 
   async total(): Promise<number> {
-    return this.greetings.length;
+    return this.store.length;
+  }
+
+  async findRecent(limit: number): Promise<readonly Greeting[]> {
+    return this.store.slice(-limit).reverse();
   }
 }

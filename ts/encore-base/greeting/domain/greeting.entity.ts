@@ -1,27 +1,64 @@
-import { Recipient } from "./recipient.vo";
+import type { DomainEvent } from "./events/domain-event";
+import { GreetingCreated } from "./events/greeting-created.event";
+import type { Language } from "./language.vo";
+import type { Recipient } from "./recipient.vo";
+
+interface GreetingProps {
+  id: string;
+  recipient: Recipient;
+  language: Language;
+  message: string;
+  visitorNumber: number;
+  createdAt: Date;
+}
 
 /**
- * Greeting — the core domain Entity.
+ * Greeting — the aggregate root.
  *
- * It owns the single business rule of this service: how a greeting message is
- * formed for a recipient and which visitor number they are. The constructor is
- * private so a Greeting can only be created through `create`, guaranteeing the
- * message is always well-formed.
- *
- * Pure domain: depends on nothing but another domain type (the Recipient VO).
+ * Construction goes through `create`, which enforces the invariants and records
+ * a `GreetingCreated` domain event. State is exposed through getters; the entity
+ * never leaks its internals or depends on anything outside the domain.
  */
 export class Greeting {
-  private constructor(
-    public readonly recipient: string,
-    public readonly message: string,
-    public readonly visitorNumber: number,
-  ) {}
+  private readonly events: DomainEvent[] = [];
 
-  static create(recipient: Recipient, visitorNumber: number): Greeting {
-    if (!Number.isInteger(visitorNumber) || visitorNumber < 1) {
+  private constructor(private readonly props: GreetingProps) {}
+
+  static create(props: GreetingProps): Greeting {
+    if (props.message.trim().length === 0) {
+      throw new Error("Greeting message must not be empty.");
+    }
+    if (!Number.isInteger(props.visitorNumber) || props.visitorNumber < 1) {
       throw new Error("visitorNumber must be a positive integer.");
     }
-    const message = `Hello, ${recipient.value}! You are visitor #${visitorNumber}.`;
-    return new Greeting(recipient.value, message, visitorNumber);
+    const greeting = new Greeting(props);
+    greeting.events.push(new GreetingCreated(props.recipient.value, props.visitorNumber));
+    return greeting;
+  }
+
+  get id(): string {
+    return this.props.id;
+  }
+  get recipient(): string {
+    return this.props.recipient.value;
+  }
+  get language(): string {
+    return this.props.language.code;
+  }
+  get message(): string {
+    return this.props.message;
+  }
+  get visitorNumber(): number {
+    return this.props.visitorNumber;
+  }
+  get createdAt(): Date {
+    return this.props.createdAt;
+  }
+
+  /** Drains and returns the events raised since the last pull. */
+  pullEvents(): readonly DomainEvent[] {
+    const drained = [...this.events];
+    this.events.length = 0;
+    return drained;
   }
 }

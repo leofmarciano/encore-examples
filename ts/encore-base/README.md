@@ -1,13 +1,13 @@
 # Clean Architecture Starter (encore-base)
 
-A tiny Encore.ts service — `hello`, `version`, `health` — built as a **complete,
-textbook Clean Architecture** reference, with every architectural rule enforced
-automatically by [ArchContract](https://www.npmjs.com/package/arch-contract).
+A small Encore.ts service built as a **complete, textbook Clean Architecture**
+reference — and kept that way automatically by
+[ArchContract](https://www.npmjs.com/package/arch-contract).
 
-The behavior is intentionally trivial. The point is the **structure**: domain at
-the center, dependencies pointing inward, infrastructure swappable behind ports,
-handlers kept thin — and a CI check that fails the build the moment any of that
-drifts.
+The behavior is intentionally simple (greet, list, version, health). The point is
+the **structure**: a pure domain at the center, dependencies pointing strictly
+inward, infrastructure hidden behind ports, thin handlers, an explicit composition
+root — and a CI check that fails the build the moment any of that drifts.
 
 ## Prerequisites
 
@@ -18,15 +18,11 @@ drifts.
 
 ## Create app
 
-Create a local app from this template:
-
 ```bash
 encore app create my-app-name --example=ts/encore-base
 ```
 
 ## Run app locally
-
-Run this command from your application's root folder:
 
 ```bash
 encore run
@@ -36,20 +32,23 @@ encore run
 
 ```bash
 curl http://localhost:4000/hello/World
-# { "message": "Hello, World! You are visitor #1.", "visitor": 1 }
+# { "id": "...", "recipient": "World", "language": "en",
+#   "message": "Hello, World! You are visitor #1.", "visitor": 1, "createdAt": "..." }
 
-curl http://localhost:4000/version
-# { "name": "encore-base", "version": "1.0.0" }
+curl "http://localhost:4000/hello/Ada?lang=pt"
+# { ... "message": "Olá, Ada! Você é o visitante #2.", ... }
 
-curl http://localhost:4000/health
-# { "status": "ok", "service": "greeting" }
+curl http://localhost:4000/greetings/recent
+# { "greetings": [ ... ] }
+
+curl http://localhost:4000/version   # { "name": "encore-base", "version": "1.0.0" }
+curl http://localhost:4000/health    # { "status": "ok", "service": "greeting" }
 ```
 
 ### Local Development Dashboard
 
 While `encore run` is running, open [http://localhost:9400/](http://localhost:9400/)
-for Encore's local developer dashboard — traces, the architecture diagram, and the
-API explorer.
+for traces, the architecture diagram, and the API explorer.
 
 ## Architecture
 
@@ -58,49 +57,60 @@ ever point **inward** (toward the domain):
 
 ```
 greeting/
-├── encore.service.ts                  # service boundary (Encore)
-├── greeting.ts                        # api — thin Encore handlers, delegate only
-├── services/
-│   └── container.ts                   # composition root — the only place that `new`s adapters
-├── domain/                            # the center: no framework, no I/O, no Encore
-│   ├── greeting.entity.ts             #   entity (business rules)
-│   ├── recipient.vo.ts                #   value object (self-validating)
-│   ├── app-info.ts                    #   domain constant
-│   └── ports/
-│       └── greeting-repository.port.ts#   driven port (interface the domain owns)
-├── application/                       # use-cases — orchestrate the domain via ports
-│   ├── say-hello.usecase.ts
-│   ├── get-version.usecase.ts
-│   └── check-health.usecase.ts
-└── infrastructure/                    # adapters — implement the ports
-    └── repositories/
-        └── in-memory-greeting.repository.ts
+├── encore.service.ts                       # service boundary (Encore)
+│
+├── domain/                                 # the center — pure, no framework, no I/O, no runtime
+│   ├── greeting.entity.ts                  #   aggregate root (raises domain events)
+│   ├── recipient.vo.ts · language.vo.ts    #   value objects (self-validating)
+│   ├── app-info.ts                         #   domain constant
+│   ├── errors/                             #   DomainError base + typed errors
+│   ├── events/                             #   DomainEvent + GreetingCreated
+│   ├── services/greeting-translator.ts     #   domain service (localization rule)
+│   └── ports/greeting-repository.port.ts   #   driven port (interface the domain owns)
+│
+├── application/                            # use-cases — orchestrate the domain via ports
+│   ├── use-cases/                          #   say-hello (command), list-recent (query), version, health
+│   ├── ports/                              #   clock · id-generator · event-publisher (driven ports)
+│   └── mappers/greeting.mapper.ts          #   entity -> read model
+│
+├── infrastructure/                         # adapters — implement the ports
+│   ├── repositories/  · clock/  · id/  · events/
+│
+├── presentation/                           # Encore handlers (thin) + HTTP error mapping
+│   ├── greeting.controller.ts
+│   └── http-error-mapper.ts
+│
+└── composition/container.ts                # composition root — the ONLY place that `new`s adapters
 ```
 
 **The dependency rule, made concrete:**
 
-- **domain** depends on nothing. Pure TypeScript — instantiate and test it with zero setup.
-- **application** (use-cases) depends only on the domain, and only through **ports** — never on a concrete adapter.
+- **domain** depends on nothing — not even the Node runtime. Instantiate and test it with zero setup.
+- **application** depends only on the domain, and only through **ports**. Use-cases are framework-agnostic (no Encore).
 - **infrastructure** implements the ports. Swap the in-memory repository for an Encore `SQLDatabase` adapter and the domain/application layers don't change.
-- **api** (Encore handlers) stay thin: they translate HTTP ⇄ use-case and nothing else. No `new`, no infrastructure imports.
-- **composition root** (`services/container.ts`) is the single place that wires concrete adapters into use-cases.
+- **presentation** (Encore handlers) stays thin: it translates HTTP ⇄ use-case and maps errors. No `new`, no infrastructure imports.
+- **composition** is the single place that wires concrete adapters into use-cases.
 
-### Architecture tests
+### Architecture tests — the contract is enforced, not hoped for
 
-The contract above isn't a convention you have to remember — it's enforced. This
-project ships an [`arch-contract.yaml`](./arch-contract.yaml) that activates the
-AAA-quality built-in `encore-ts` preset and layers strict Clean Architecture
-rules on top:
+This project ships an [`arch-contract.yaml`](./arch-contract.yaml) that activates
+the AAA-quality built-in `encore-ts` preset and reshapes it into strict Clean
+Architecture:
 
 ```bash
 npm install
 npm run arch:check
 ```
 
-It verifies, among other things, that the domain never imports outward, use-cases
-never touch infrastructure, every use-case is a `*UseCase` class with `execute()`,
-repository ports are interfaces, concrete repositories implement a port, and the
-Encore handlers stay thin. Wire it into CI and architectural drift fails the build.
+It enforces, with **zero violations required to pass**:
+
+- the full **inward dependency rule** between layers (domain ← application ← infrastructure; presentation → use-cases only; only the composition root may touch infrastructure);
+- **every file belongs to a layer** (`unassignedFiles: error` — no stragglers);
+- **shape**: use-cases are `*UseCase` classes with `execute()`; ports are interfaces; entities and value objects are classes; domain errors extend `DomainError`; infrastructure classes implement a port;
+- **purity**: the domain imports no framework and no runtime; the application imports no framework;
+- **thin handlers**: controllers never instantiate use-cases/repositories and never call `console.log`.
+
+Wire `npm run arch:check` into CI and architectural drift fails the build.
 
 ### Unit tests
 
@@ -113,17 +123,16 @@ npm test
 
 ## Development
 
-### Add a new service
-
-Create a new directory with an `encore.service.ts` and at least one API. Mirror the
-same `domain / application / infrastructure` layering inside it.
-Learn more: https://encore.dev/docs/ts/primitives/services
-
 ### Add a database
 
-Replace the in-memory adapter with an Encore `SQLDatabase`-backed repository that
-implements `GreetingRepositoryPort` — nothing in the domain or application layers
-changes. Learn more: https://encore.dev/docs/ts/primitives/databases
+Replace `InMemoryGreetingRepository` with an Encore `SQLDatabase`-backed adapter
+that implements `GreetingRepositoryPort` — nothing in the domain or application
+layers changes. See https://encore.dev/docs/ts/primitives/databases
+
+### Publish domain events across services
+
+Replace `InMemoryEventPublisher` with an Encore Pub/Sub `Topic` adapter behind the
+same `EventPublisherPort`. See https://encore.dev/docs/ts/primitives/pubsub
 
 ## Deployment
 
